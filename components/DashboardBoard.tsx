@@ -5,7 +5,7 @@ import UploadHero from './UploadHero';
 import HistoryTable from './HistoryTable';
 import styles from './DashboardBoard.module.css';
 
-export default function DashboardBoard({ gridClassName }) {
+export default function DashboardBoard({ gridClassName }: { gridClassName: string }) {
   const [refreshTick, setRefreshTick] = useState(0);
 
   const handleUploaded = useCallback(() => {

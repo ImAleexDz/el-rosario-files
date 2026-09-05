@@ -6,30 +6,20 @@ import ClinicLogo from './ClinicLogo';
 import styles from './LoginCard.module.css';
 
 const STEPS = {
-  START: 'start',
   CREDENTIALS: 'credentials',
   MFA: 'mfa',
 };
 
 export default function LoginCard() {
   const router = useRouter();
-  const [step, setStep] = useState(STEPS.START);
+  const [step, setStep] = useState(STEPS.CREDENTIALS);
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [mfaCode, setMfaCode] = useState('');
-  const [loadingSSO, setLoadingSSO] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
 
-  async function handleSSO() {
-    setError('');
-    setLoadingSSO(true);
-    // Simula el redireccionamiento/roundtrip del proveedor SSO de la clínica.
-    await new Promise((r) => setTimeout(r, 900));
-    router.push('/dashboard');
-  }
-
-  async function handleCredentialsSubmit(e) {
+  async function handleCredentialsSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -56,7 +46,7 @@ export default function LoginCard() {
     }
   }
 
-  async function handleMfaSubmit(e) {
+  async function handleMfaSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
     setError('');
     setLoading(true);
@@ -88,37 +78,6 @@ export default function LoginCard() {
           <p className={styles.portalName}>Portal clínico</p>
         </div>
       </div>
-
-      {step === STEPS.START && (
-        <>
-          <h1 className={styles.title}>Bienvenido, doctor(a)</h1>
-          <p className={styles.subtitle}>
-            Ingresa con tu cuenta institucional para continuar.
-          </p>
-
-          <button
-            type="button"
-            className={styles.ssoButton}
-            onClick={handleSSO}
-            disabled={loadingSSO}
-          >
-            {loadingSSO ? (
-              <span className={styles.spinner} aria-hidden="true" />
-            ) : (
-              <span className={styles.ssoIcon} aria-hidden="true">🔒</span>
-            )}
-            {loadingSSO ? 'Conectando…' : 'Iniciar sesión con cuenta de la clínica'}
-          </button>
-
-          <button
-            type="button"
-            className={styles.linkButton}
-            onClick={() => setStep(STEPS.CREDENTIALS)}
-          >
-            Usar correo y contraseña institucional
-          </button>
-        </>
-      )}
 
       {step === STEPS.CREDENTIALS && (
         <form onSubmit={handleCredentialsSubmit} className={styles.form}>
@@ -156,17 +115,6 @@ export default function LoginCard() {
           <button type="submit" className={styles.primaryButton} disabled={loading}>
             {loading ? <span className={styles.spinner} aria-hidden="true" /> : 'Continuar'}
           </button>
-
-          <button
-            type="button"
-            className={styles.linkButton}
-            onClick={() => {
-              setStep(STEPS.START);
-              setError('');
-            }}
-          >
-            Volver a la cuenta de la clínica
-          </button>
         </form>
       )}
 
@@ -174,7 +122,7 @@ export default function LoginCard() {
         <form onSubmit={handleMfaSubmit} className={styles.form}>
           <h1 className={styles.title}>Verificación en dos pasos</h1>
           <p className={styles.subtitle}>
-            Ingresa el código de 6 dígitos enviado a tu dispositivo autenticador.
+            Ingresa el código de 6 dígitos de tu aplicación autenticadora.
           </p>
 
           <label className={styles.label} htmlFor="mfa">Código de verificación</label>

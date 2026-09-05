@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
 import styles from './HistoryTable.module.css';
+import type { Submission } from '../lib/types';
 
-function formatPhone(phone) {
+function formatPhone(phone: string) {
   if (!phone || phone.length !== 10) return phone;
   return `${phone.slice(0, 2)} ${phone.slice(2, 6)} ${phone.slice(6)}`;
 }
 
-function relativeTime(timestamp) {
+function relativeTime(timestamp: number) {
   const diffMs = Date.now() - timestamp;
   const mins = Math.floor(diffMs / 60000);
   if (mins < 1) return 'Hace un momento';
@@ -18,10 +19,10 @@ function relativeTime(timestamp) {
   return `Hace ${hours} h`;
 }
 
-export default function HistoryTable({ refreshTick }) {
-  const [items, setItems] = useState([]);
+export default function HistoryTable({ refreshTick }: { refreshTick: number }) {
+  const [items, setItems] = useState<Submission[]>([]);
   const [loading, setLoading] = useState(true);
-  const [revokingId, setRevokingId] = useState(null);
+  const [revokingId, setRevokingId] = useState<string | null>(null);
 
   async function loadHistory() {
     try {
@@ -37,7 +38,7 @@ export default function HistoryTable({ refreshTick }) {
     loadHistory();
   }, [refreshTick]);
 
-  async function handleRevoke(id) {
+  async function handleRevoke(id: string) {
     setRevokingId(id);
     try {
       const res = await fetch('/api/revoke', {
@@ -48,7 +49,7 @@ export default function HistoryTable({ refreshTick }) {
       const data = await res.json();
       if (data.ok) {
         setItems((prev) =>
-          prev.map((it) => (it.id === id ? { ...it, status: 'expired' } : it))
+          prev.map((it) => (it.id === id ? { ...it, status: 'expired' as const } : it))
         );
       }
     } finally {
