@@ -31,10 +31,34 @@
   background: var(--warning);
 }
 
+.viewed {
+  background: var(--teal-soft);
+  color: var(--teal);
+}
+.viewed .dot {
+  background: var(--teal);
+}
+
 .expired {
   background: var(--danger-soft);
   color: var(--danger);
 }
 .expired .dot {
+  background: var(--danger);
+}
+
+.revoked {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.revoked .dot {
+  background: var(--danger);
+}
+
+.locked {
+  background: var(--danger-soft);
+  color: var(--danger);
+}
+.locked .dot {
   background: var(--danger);
 }

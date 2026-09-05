@@ -3,12 +3,9 @@
 import { useEffect, useState } from 'react';
 import StatusBadge from './StatusBadge';
 import styles from './HistoryTable.module.css';
-import type { Submission } from '../lib/types';
+import type { Submission, SubmissionStatus } from '../lib/types';
 
-function formatPhone(phone: string) {
-  if (!phone || phone.length !== 10) return phone;
-  return `${phone.slice(0, 2)} ${phone.slice(2, 6)} ${phone.slice(6)}`;
-}
+const REVOCABLE_STATUSES: SubmissionStatus[] = ['pending', 'viewed'];
 
 function relativeTime(timestamp: number) {
   const diffMs = Date.now() - timestamp;
@@ -49,7 +46,7 @@ export default function HistoryTable({ refreshTick }: { refreshTick: number }) {
       const data = await res.json();
       if (data.ok) {
         setItems((prev) =>
-          prev.map((it) => (it.id === id ? { ...it, status: 'expired' as const } : it))
+          prev.map((it) => (it.id === id ? { ...it, status: 'revoked' as const } : it))
         );
       }
     } finally {
@@ -73,7 +70,7 @@ export default function HistoryTable({ refreshTick }: { refreshTick: number }) {
           <table className={styles.table}>
             <thead>
               <tr>
-                <th>Celular</th>
+                <th>Paciente</th>
                 <th>Hora</th>
                 <th>Estado</th>
                 <th aria-label="Acción" />
@@ -82,7 +79,7 @@ export default function HistoryTable({ refreshTick }: { refreshTick: number }) {
             <tbody>
               {items.map((item) => (
                 <tr key={item.id}>
-                  <td className={styles.mono}>{formatPhone(item.phone)}</td>
+                  <td>{item.patientName}</td>
                   <td className={styles.timeCell}>{relativeTime(item.createdAt)}</td>
                   <td>
                     <StatusBadge status={item.status} />
@@ -92,9 +89,9 @@ export default function HistoryTable({ refreshTick }: { refreshTick: number }) {
                       type="button"
                       className={styles.revokeButton}
                       onClick={() => handleRevoke(item.id)}
-                      disabled={item.status === 'expired' || revokingId === item.id}
+                      disabled={!REVOCABLE_STATUSES.includes(item.status) || revokingId === item.id}
                       title="Revocar enlace"
-                      aria-label={`Revocar enlace de ${formatPhone(item.phone)}`}
+                      aria-label={`Revocar enlace de ${item.patientName}`}
                     >
                       {revokingId === item.id ? '…' : '🗑'}
                     </button>
@@ -107,8 +104,7 @@ export default function HistoryTable({ refreshTick }: { refreshTick: number }) {
       )}
 
       <p className={styles.footNote}>
-        Se muestran los últimos {items.length} movimientos. Los archivos ya
-        descargados o expirados se eliminan del servidor.
+        Se muestran los últimos {items.length} movimientos.
       </p>
     </div>
   );

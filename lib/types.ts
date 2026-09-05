@@ -1,8 +1,8 @@
-export type SubmissionStatus = 'downloaded' | 'pending' | 'expired';
+export type SubmissionStatus = 'pending' | 'viewed' | 'downloaded' | 'expired' | 'revoked' | 'locked';
 
 export type Submission = {
   id: string;
-  phone: string;
+  patientName: string;
   fileName: string;
   createdAt: number;
   status: SubmissionStatus;

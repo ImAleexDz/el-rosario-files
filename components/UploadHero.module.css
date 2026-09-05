@@ -355,6 +355,37 @@
   border-color: var(--teal);
 }
 
+/* --- Patient search results --- */
+
+.patientResults {
+  margin-top: 8px;
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  overflow: hidden;
+}
+
+.patientResultItem {
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 2px;
+  padding: 10px 12px;
+  background: var(--surface);
+  border: none;
+  border-bottom: 1px solid var(--border);
+  cursor: pointer;
+  text-align: left;
+}
+
+.patientResultItem:last-child {
+  border-bottom: none;
+}
+
+.patientResultItem:hover {
+  background: var(--surface-sunken);
+}
+
 @media (max-width: 520px) {
   .fieldRow {
     flex-direction: column;
