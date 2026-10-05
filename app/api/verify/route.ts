@@ -1,6 +1,7 @@
 import { NextResponse } from 'next/server';
 import { createAdminClient } from '@/lib/supabase/admin';
 import { hashShareToken } from '@/lib/tokens';
+import { createViewerSession } from '@/lib/viewerSessions';
 
 const SIGNED_URL_TTL_SECONDS = 300;
 
@@ -26,7 +27,7 @@ export async function POST(request: Request) {
   const { data: share } = await admin
     .from('record_shares')
     .select(
-      'id, status, attempt_count, max_attempts, expires_at, patients(date_of_birth), medical_record_files(storage_bucket, storage_path, file_name)'
+      'id, status, attempt_count, max_attempts, expires_at, study_id, patients(date_of_birth), medical_record_files(storage_bucket, storage_path, file_name)'
     )
     .eq('token_hash', tokenHash)
     .single();
@@ -87,6 +88,26 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'Fecha de nacimiento incorrecta.' }, { status: 401 });
   }
 
+  if (share.study_id) {
+    const viewerToken = await createViewerSession(share.id);
+    if (!viewerToken) {
+      return NextResponse.json({ ok: false, error: 'No se pudo preparar el visor.' }, { status: 500 });
+    }
+
+    const now = new Date().toISOString();
+    await admin.from('record_shares').update({ status: 'viewed', viewed_at: now }).eq('id', share.id);
+
+    await admin.from('audit_log').insert({
+      actor_type: 'patient',
+      action: 'verify_and_view_study',
+      entity_type: 'record_shares',
+      entity_id: share.id,
+      ip_address: ip,
+    });
+
+    return NextResponse.json({ ok: true, kind: 'study', shareId: share.id, viewerToken });
+  }
+
   const { data: signedUrlData, error: signedUrlError } = await admin.storage
     .from(file.storage_bucket)
     .createSignedUrl(file.storage_path, SIGNED_URL_TTL_SECONDS);
@@ -111,6 +132,7 @@ export async function POST(request: Request) {
 
   return NextResponse.json({
     ok: true,
+    kind: 'file',
     downloadUrl: signedUrlData.signedUrl,
     fileName: file.file_name,
   });

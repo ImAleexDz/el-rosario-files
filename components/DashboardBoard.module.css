@@ -2,3 +2,30 @@
 .secondaryColumn {
   min-width: 0;
 }
+
+.tabRow {
+  display: flex;
+  gap: 6px;
+  margin-bottom: 12px;
+}
+
+.tab {
+  background: var(--surface);
+  border: 1px solid var(--border);
+  border-radius: var(--radius-sm);
+  padding: 8px 14px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--ink-muted);
+  cursor: pointer;
+}
+
+.tab:hover {
+  border-color: var(--border-strong);
+}
+
+.tabActive {
+  background: var(--teal-soft);
+  border-color: var(--teal);
+  color: var(--teal);
+}

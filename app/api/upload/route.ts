@@ -2,19 +2,10 @@ import { randomUUID, createHash } from 'crypto';
 import { NextResponse } from 'next/server';
 import { createClient } from '@/lib/supabase/server';
 import { createAdminClient } from '@/lib/supabase/admin';
-import { generateShareToken } from '@/lib/tokens';
+import { resolvePatient } from '@/lib/patients';
+import { createShare } from '@/lib/shares';
 
 const MAX_FILE_BYTES = 20 * 1024 * 1024; // 20 MB
-const SHARE_TTL_DAYS = 7;
-const EMAIL_RE = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
-
-function isValidDateOfBirth(value: string) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(value)) return false;
-  const date = new Date(`${value}T00:00:00Z`);
-  if (Number.isNaN(date.getTime())) return false;
-  const year = date.getUTCFullYear();
-  return year >= 1900 && date.getTime() <= Date.now();
-}
 
 export async function POST(request: Request) {
   const supabase = await createClient();
@@ -50,77 +41,20 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'El archivo supera el límite de 20 MB.' }, { status: 400 });
   }
 
-  let patientId: string;
-  let patientEmail: string | null;
+  const patientResult = await resolvePatient(supabase, {
+    mode: mode === 'existing' ? 'existing' : 'new',
+    patientId: String(form.get('patientId') || ''),
+    emailOverride: String(form.get('emailOverride') || ''),
+    fullName: String(form.get('fullName') || ''),
+    dateOfBirth: String(form.get('dateOfBirth') || ''),
+    email: String(form.get('email') || ''),
+  });
 
-  if (mode === 'existing') {
-    patientId = String(form.get('patientId') || '');
-    if (!patientId) {
-      return NextResponse.json({ ok: false, error: 'Falta el paciente seleccionado.' }, { status: 400 });
-    }
-
-    const emailOverride = String(form.get('emailOverride') || '').trim();
-
-    const { data: patient, error: patientError } = await supabase
-      .from('patients')
-      .select('id, email')
-      .eq('id', patientId)
-      .single();
-
-    if (patientError || !patient) {
-      return NextResponse.json({ ok: false, error: 'Paciente no encontrado.' }, { status: 404 });
-    }
-
-    patientEmail = patient.email;
-
-    if (!patientEmail && emailOverride) {
-      if (!EMAIL_RE.test(emailOverride)) {
-        return NextResponse.json({ ok: false, error: 'Correo del paciente inválido.' }, { status: 400 });
-      }
-      const { error: updateError } = await supabase
-        .from('patients')
-        .update({ email: emailOverride })
-        .eq('id', patientId);
-      if (updateError) {
-        return NextResponse.json({ ok: false, error: 'No se pudo guardar el correo del paciente.' }, { status: 500 });
-      }
-      patientEmail = emailOverride;
-    }
-  } else {
-    const fullName = String(form.get('fullName') || '').trim();
-    const dateOfBirth = String(form.get('dateOfBirth') || '').trim();
-    const email = String(form.get('email') || '').trim();
-
-    if (!fullName || fullName.length < 3) {
-      return NextResponse.json({ ok: false, error: 'Nombre del paciente inválido.' }, { status: 400 });
-    }
-    if (!isValidDateOfBirth(dateOfBirth)) {
-      return NextResponse.json({ ok: false, error: 'Fecha de nacimiento inválida.' }, { status: 400 });
-    }
-    if (!EMAIL_RE.test(email)) {
-      return NextResponse.json({ ok: false, error: 'Correo del paciente inválido.' }, { status: 400 });
-    }
-
-    const { data: newPatient, error: insertError } = await supabase
-      .from('patients')
-      .insert({ full_name: fullName, date_of_birth: dateOfBirth, email })
-      .select('id, email')
-      .single();
-
-    if (insertError || !newPatient) {
-      return NextResponse.json({ ok: false, error: 'No se pudo registrar al paciente.' }, { status: 500 });
-    }
-
-    patientId = newPatient.id;
-    patientEmail = newPatient.email;
+  if (!patientResult.ok) {
+    return NextResponse.json({ ok: false, error: patientResult.error }, { status: patientResult.status });
   }
 
-  if (!patientEmail) {
-    return NextResponse.json(
-      { ok: false, error: 'El paciente no tiene correo registrado para el envío.' },
-      { status: 400 }
-    );
-  }
+  const { patientId } = patientResult;
 
   const fileBuffer = Buffer.from(await file.arrayBuffer());
   const checksum = createHash('sha256').update(fileBuffer).digest('hex');
@@ -157,24 +91,14 @@ export async function POST(request: Request) {
     return NextResponse.json({ ok: false, error: 'No se pudo registrar el expediente.' }, { status: 500 });
   }
 
-  const { token, tokenHash } = generateShareToken();
-  const expiresAt = new Date(Date.now() + SHARE_TTL_DAYS * 24 * 60 * 60 * 1000).toISOString();
+  const share = await createShare(supabase, {
+    patientId,
+    doctorId: user.id,
+    fileId: fileRow.id,
+    channel: 'email',
+  });
 
-  const { data: shareRow, error: shareError } = await supabase
-    .from('record_shares')
-    .insert({
-      file_id: fileRow.id,
-      patient_id: patientId,
-      created_by: user.id,
-      token_hash: tokenHash,
-      channel: 'email',
-      status: 'pending',
-      expires_at: expiresAt,
-    })
-    .select('id')
-    .single();
-
-  if (shareError || !shareRow) {
+  if (!share) {
     return NextResponse.json({ ok: false, error: 'No se pudo generar el enlace seguro.' }, { status: 500 });
   }
 
@@ -185,11 +109,11 @@ export async function POST(request: Request) {
     action: 'upload_and_share',
     entity_type: 'medical_record_files',
     entity_id: fileRow.id,
-    metadata: { patientId, shareId: shareRow.id, channel: 'email' },
+    metadata: { patientId, shareId: share.shareId, channel: 'email' },
   });
 
   const origin = new URL(request.url).origin;
-  const secureLink = `${origin}/verificar/${token}`;
+  const secureLink = `${origin}/verificar/${share.token}`;
 
   return NextResponse.json({ ok: true, secureLink });
 }

@@ -1,13 +1,23 @@
 'use client';
 
 import { useState } from 'react';
+import dynamic from 'next/dynamic';
 import styles from './LoginCard.module.css';
+
+const DicomViewer = dynamic(() => import('./DicomViewer'), {
+  ssr: false,
+  loading: () => <p className={styles.subtitle}>Cargando visor…</p>,
+});
+
+type Result =
+  | { kind: 'file'; downloadUrl: string; fileName: string }
+  | { kind: 'study'; shareId: string; viewerToken: string };
 
 export default function VerifyForm({ token }: { token: string }) {
   const [dateOfBirth, setDateOfBirth] = useState('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
-  const [result, setResult] = useState<{ downloadUrl: string; fileName: string } | null>(null);
+  const [result, setResult] = useState<Result | null>(null);
 
   async function handleSubmit(e: React.FormEvent<HTMLFormElement>) {
     e.preventDefault();
@@ -24,7 +34,11 @@ export default function VerifyForm({ token }: { token: string }) {
         setError(data.error || 'No se pudo verificar tu identidad.');
         return;
       }
-      setResult({ downloadUrl: data.downloadUrl, fileName: data.fileName });
+      if (data.kind === 'study') {
+        setResult({ kind: 'study', shareId: data.shareId, viewerToken: data.viewerToken });
+      } else {
+        setResult({ kind: 'file', downloadUrl: data.downloadUrl, fileName: data.fileName });
+      }
     } catch {
       setError('Error de conexión. Intenta de nuevo.');
     } finally {
@@ -33,7 +47,7 @@ export default function VerifyForm({ token }: { token: string }) {
   }
 
   return (
-    <div className={styles.card}>
+    <div className={styles.card} style={result?.kind === 'study' ? { maxWidth: 680 } : undefined}>
       <div className={styles.brand}>
         <div>
           <p className={styles.clinicName}>Clínica Médica El Rosario</p>
@@ -41,7 +55,11 @@ export default function VerifyForm({ token }: { token: string }) {
         </div>
       </div>
 
-      {result ? (
+      {result?.kind === 'study' && (
+        <DicomViewer shareId={result.shareId} viewerToken={result.viewerToken} />
+      )}
+
+      {result?.kind === 'file' && (
         <div className={styles.form}>
           <h1 className={styles.title}>Verificación exitosa</h1>
           <p className={styles.subtitle}>
@@ -56,7 +74,9 @@ export default function VerifyForm({ token }: { token: string }) {
             Descargar expediente
           </a>
         </div>
-      ) : (
+      )}
+
+      {!result && (
         <form onSubmit={handleSubmit} className={styles.form}>
           <h1 className={styles.title}>Verifica tu identidad</h1>
           <p className={styles.subtitle}>
